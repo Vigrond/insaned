@@ -1,0 +1,29 @@
+#!/bin/bash
+
+# prevent multiple instances of the script from running
+pidof -o %PPID -x "$0" >/dev/null && echo "ERROR: Another scan operation is already in progress ($0) please wait until it completes." && exit 1
+
+# store the current script dir
+SCRIPT_DIR=$( cd -- "$( dirname -- "${BASH_SOURCE[0]}" )" &> /dev/null && pwd )
+
+echo "initiating scan"
+
+# import variable values from .env file - see: ssjs_example.env for more
+set -o allexport
+source "$SCRIPT_DIR/.env"
+set +o allexport
+
+# set PATH
+PATH=$PATH:/bin:/usr/bin
+export PATH
+
+if [[ -z ${DEVICE_ID} ]] ; then
+    echo "setting device ID to: $1"
+    export DEVICE_ID="$1"
+fi
+
+# choose which scan script to launch when the button named 'scan' is pressed
+# set this variable in your .env file
+source "$SCRIPT_DIR/$SCAN_SCRIPT"
+
+

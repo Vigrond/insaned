@@ -1,0 +1,57 @@
+#!/bin/bash
+
+# scanservjs (https://github.com/sbs20/scanservjs) - execute scan through scanservjs web interface
+# set up your .env file first - see _example.env for more info
+
+# this script executes a scan via a scanservjs instance - you will need an instance running first
+# it can accomodate a locally (use 127.0.0.1 for HOST) or remotely hosted scanservjs instance
+# the latter is useful when a low-power device (e.g. raspverry pi zero) is used to 'untether'
+# while a remote instance then does the heavy lifting (image processing, OCR, indexing etc)
+
+# your scanner may present different options to the ones below
+# a quick way to get a definitive list for your scanner:
+## open dev tools (F12) in Chrome and click on the 'Network' tab
+## navigate to your scnservjs instance, populate with the desired values, then click 'Scan'
+## right click on the new request in the Network window 'scan' and choose `copy curl`
+## paste below and add/substitute any new variables in .env and below as needed.
+
+# you may also want to specify the file output directory, this must be done in the scanserv config file
+# see: https://github.com/sbs20/scanservjs/blob/master/docs/config.md for more information
+
+# get helper functions
+source "$SCRIPT_DIR/common"
+
+# first GET current device (retrieves the first device found)
+#export SSJS_DEVICE_ID="net:$SANE_HOST:$DEVICE_ID" # not reliable (e.g. if scanner sleeps and assigned a new usb id)
+export SSJS_DEVICE_ID=$(ssjs_get_scanner_device)
+echo -e "SSJS_DEVICE_ID value is: $SSJS_DEVICE_ID" # debug
+
+
+# then POST a request to scan image
+echo -e "scanning image ... this could take some time depending on the number of pages"
+#curl -vvv https://httpbin.org/post \
+curl "$SSJS_PROTOCOL://$SSJS_HOST:$SSJS_PORT/$SSJS_PATH" \
+  -H "Connection: keep-alive" \
+  -H "Accept: application/json" \
+  -H "Content-Type: application/json" \
+  -H "Origin: $SSJS_PROTOCOL://$SSJS_HOST:$SSJS_PORT" \
+  -H "Referer: $SSJS_PROTOCOL://$SSJS_HOST:$SSJS_PORT/" \
+  --compressed \
+  --insecure \
+  --data @- <<EOF
+{
+    "params": {
+        "deviceId": "$SSJS_DEVICE_ID",
+        "resolution": $SSJS_RESOLUTION,
+        "mode": "$SSJS_MODE",
+        "source": "$SSJS_SOURCE",
+        "brightness": $SSJS_BRIGHTNESS,
+        "contrast": $SSJS_CONTRAST
+    },
+    "filters": $(json_array "${SSJS_FILTERS[@]}"),
+    "pipeline": "$SSJS_PIPELINE",
+    "batch": "$SSJS_BATCH",
+    "index": 1
+}
+EOF
+

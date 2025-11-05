@@ -1,0 +1,36 @@
+#!/bin/sh
+
+# scans an image with 300 dpi and automatically crops and deskews it
+# scanimage options are tuned for Canon LiDE 210
+
+TMPFILE="/tmp/scan.tiff"
+OUTFILE="$HOME/scan-$(date '+%Y-%m-%d_%H-%M-%S').jpg"
+LOCKFILE="/tmp/insaned-scan.lock"
+INSANED_LOGFILE="/tmp/insaned.log"
+
+if [ -f "$LOCKFILE" ]; then
+    echo "Error: Another scanning operation is currently in progress" >> "$INSANED_LOGFILE"
+    exit 0
+fi
+# cleanup on exit
+finish() {
+    rm -f "$LOCKFILE" >/dev/null 2>&1
+}
+trap finish EXIT
+touch "$LOCKFILE"
+
+
+rm -f "$TMPFILE" >/dev/null 2>&1
+
+# for Canon LiDE 210
+scanimage --device-name "$1" --format tiff --mode Color --swdeskew=yes --swcrop=yes \
+    --resolution 300 --contrast 2 --brightness 2 > "$TMPFILE"
+
+convert "$TMPFILE" -quality 85 "$OUTFILE" >> "$INSANED_LOGFILE" 2>&1
+
+rm -f "$TMPFILE" >/dev/null 2>&1
+
+if ! pgrep gwenview >/dev/null ; then
+    gwenview "$OUTFILE" &
+fi
+

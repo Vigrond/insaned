@@ -1,0 +1,23 @@
+#!/bin/bash
+
+printf "\nscanner online"
+
+printf "\nload environment variables"
+
+# store the current script dir
+SCRIPT_DIR=$( cd -- "$( dirname -- "${BASH_SOURCE[0]}" )" &> /dev/null && pwd )
+
+# import variable values from .env file - see: ssjs_example.env for more
+set -o allexport
+source "$SCRIPT_DIR/.env"
+# get helper functions
+source "$SCRIPT_DIR/common"
+set +o allexport
+
+if [[ ${SCAN_SCRIPT}="scanservjs" ]] ; then
+    printf "\nusing scanservjs front-end"
+    printf "\n- refreshing scanservjs scanners..."
+    ssjs_clear_scanner_device
+    ssjs_get_scanner_device
+fi
+
