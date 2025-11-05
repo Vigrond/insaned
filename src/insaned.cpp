@@ -215,7 +215,7 @@ int main(int argc, char ** argv)
     }
 
     try {
-        daemon.init(devname, events_dir, sleep_ms, verbose, do_fork && !(help || list), suspend);
+        daemon.init(devname, events_dir, sleep_ms, verbose, do_fork, suspend);
 
         /* print help and device list */
         if (help) {

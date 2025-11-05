@@ -333,12 +333,8 @@ void InsaneDaemon::log(const std::string & message, int verbosity) noexcept
     } catch (...) {
         // try to log on stderr if syslog failed somehow
         try {
-            if (mLogToSyslog) {
-                std::cerr << InsaneDaemon::NAME << ": " << message << std::endl;
-            } else {
-                // die
-                std::abort();
-            }
+            std::cerr << InsaneDaemon::NAME << ": " << message << std::endl;
+            std::abort();
         } catch (...) {
             // nothing helps, die
             std::abort();

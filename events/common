@@ -14,7 +14,7 @@ json_array() {
 
 ssjs_clear_scanner_device() {
   # delete previously detected scanservjs device and output to stderr
-  echo $(curl -sX "DELETE" "$SSJS_PROTOCOL://$SSJS_HOST:$SSJS_PORT/context" \
+  echo $(curl -sX "DELETE" "$SSJS_PROTOCOL://$SSJS_HOST:$SSJS_PORT/api/v1/context" \
 	  -H 'Connection: keep-alive' \
 	  -H 'Accept: */*' \
 	  --compressed \
@@ -23,7 +23,7 @@ ssjs_clear_scanner_device() {
 
 ssjs_get_scanner_device() {
  # get new device name and return to stdout
-  device=$(curl -s "$SSJS_PROTOCOL://$SSJS_HOST:$SSJS_PORT/context" \
+  device=$(curl -s "$SSJS_PROTOCOL://$SSJS_HOST:$SSJS_PORT/api/v1/context" \
 	  -H 'Connection: keep-alive' \
 	  -H 'Accept: */*' \
 	  --compressed \
