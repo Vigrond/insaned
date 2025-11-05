@@ -22,6 +22,7 @@ RUN apt-get update \
     sane-airscan \
     ipp-usb \
     curl \
+    jq \
   && rm -rf /var/lib/apt/lists/*;
 
 FROM insane-base AS insane-core
