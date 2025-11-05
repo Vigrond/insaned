@@ -1,66 +1,153 @@
-insaned
-=======
+# insaned
+
+This project is a fork of https://gitlab.com/xeijin-dev/insaned
+
+This fork intends to Dockerize insaned for usage with Scanservjs, as well as fix numerous bugs.
+
+Original READMEs can be found in the root directory.
+
+## Description
 
 Insaned is a simple linux daemon for polling button presses on SANE-managed scanners. 
 
-It's simpler to setup than alternatives such as **scanbd**, but you will need a scanner which **exposes buttons as sensors**.
+## Example Docker Compose with Scanservjs
 
-> :small_blue_diamond: **this project is a fork**
->
-> please see the original project https://github.com/abusenius/insaned
->
-> or README-orig.md for more information.
+This example assumes the CWD contains relevant git cloned projects in `./scanservjs` and `./insaned`
 
-## updates in this version
+The env var `SANED_NET_HOSTS` is the host address of a USB connected scanner that is configured with `Sane over Network`:  (Debian wiki: https://wiki.debian.org/SaneOverNetwork)  (ArchLinux wiki: https://wiki.archlinux.org/title/SANE#Sharing_your_scanner_over_a_network).  Both `insaned` and `./scanservjs` need this to operate correctly.
 
-this version incorporates a few changes including:
+Currently `insaned` only polls the first scanner found.
 
-- [fix for a segmentation](https://github.com/abusenius/insaned/issues/15) fault by [bsdice](https://github.com/bsdice)
-- [various fixes including re-attaching a device](https://github.com/hannesrauhe/insaned) by [hannesrauhe](https://github.com/hannesrauhe)
-- support for **[scanservjs](https://github.com/sbs20/scanservjs)** (requires `curl` also)
-- support for loading configuration via a `.env` file, see **[_example.env](./events/_example.env)**
-- `make debian` for creating a debian package 
-
-## installation
-a package compiled for `armv6` (compatible with a Raspberry Pi Zero W) is included in each **[release](https://gitlab.com/xeijin-dev/insaned/-/releases)**, ssh into your raspberry pi and use `wget` or `curl` to download the package, then `sudo dpkg -i insaned_0.0.x_armhf.deb` to install.
-
-for other operating systems/architectures see the build section below.
-
-## usage
-
-First check which compatible sensors/buttons your scanner has by running `insaned -L` - this should provide a list with names.
-
-Assuming you only want to use the 'scan' button -- rename `_example.env` to `.env` and edit for your scanner
-
-for **[scanservjs](https://github.com/sbs20/scanservjs)**  support you will need an instance hosted either locally or remotely, change the `SCAN_SCRIPT` variable in your .env file to `scanservjs`.
-
-once the above is complete, simply hit the 'Scan' button on your compatible scanner and the script should kick-in.
-
-To get other buttons on your scanner working, you'll need to create a new script in `/etc/insaned/events` with the same name as listed in `insaned -L`. Use the `scanimage` and `scanservjs` scripts as examples.
-
-## build
-
-You will need `libsane-dev` installed on your machine.
-
-### debian
-
-first do an `apt install` of `debhelper`, then clone the source and execute `make debian` in the root. The `.deb` file will be placed in the parent directory.
-
-### other systemd distro
-
-run `make` in the root directory, you will need to ensure you copy over the event and systemd scripts to the appropriate locations for your distro see below for an example
+`Scanservjs` is locally built so that the user configuration is setup correctly, and Docker volumes are easily accessed from the host.  This makes it possible to streamline an NFS share to say a Paperless-ngx consume
+folder as a docker volume and user permissions are set correctly.
 
 ```
-# copy binary and scripts
-sudo cp insaned /usr/bin
-sudo cp systemd/insaned.service /etc/systemd/system
-sudo touch /etc/default/insaned
-sudo systemctl start insaned
-sudo systemctl enable insaned
+services:
+  scanservjs:
+    build:
+      context: ./scanservjs
+      args:
+        # ----- enter UID and GID here -----
+        UID: 1000
+        GID: 1000
+        UNAME: user
+      target: scanservjs-user2001
+    container_name: scanservjs
+    environment:
+      # ----- specify network scanners here; see above for more possibilities -----
+      - SANED_NET_HOSTS=192.168.0.101
+    volumes:
+      # ---- enter your target location for scans before the ':' character -----
+      - ./.data/scans:/var/lib/scanservjs/output
+      - ./.data/config:/etc/scanservjs
+    user: 1000:1000
+    restart: unless-stopped
+  insaned:
+    build:
+      context: ./insaned
+    container_name: scanservjs_insaned
+    environment:
+      # ----- specify network scanners here; see above for more possibilities -----
+      - SANED_NET_HOSTS=192.168.0.101
+    volumes:
+      - ./insaned.env:/etc/insaned/events/.env
+    restart: unless-stopped
 
-# copy over event scripts and make them executable
-sudo cp insaned/events /etc
-sudo chmod +x /etc/insaned/events/*
 ```
 
+## Example .env file
 
+Strangely, this .env file acts as script for configuring `Insaned`.  In the above docker compose file, it is referenced as `./insaned.env`
+
+This config uses a custom `ocrmypdf` pipeline defined in Scanservjs.
+
+```
+#!/bin/bash
+# _example.env - update for your scanner & rename to '.env'
+
+# this file is sourced by the 'scan' script
+# its provided as an example, modify and rename for your needs
+
+### general
+# select the script to be executed when the scan button is pressed
+## scanimage - the classic scanning image, use this for testing and keep it if it meets your needs
+## scanservjs - execute a scan via a user friendly web front-end and easily access scans from a browser - see scanservjs file for more info
+export SCAN_SCRIPT="scanservjs"
+
+# add other buttons or sensors here as required - you'll need to use a similar template to the scan script
+
+### scanservjs
+# note - the parameters below are for a Fujitsu ScanSnap S1300i
+# consult the scanservjs documentation for your own scanner
+
+# scanservjs instance - usually only HOST needs to be changed
+export SSJS_PROTOCOL="https" # https untested (unsupported?) currently
+export SSJS_HOST="scanserv.yourhost.tld" # or IP address
+export SSJS_PORT=443
+export SSJS_PATH="api/v1/scan"
+
+# below env vars are deprecated in 0.4.  insaned just grabs first avail scanner in events/common:ssjs_get_scanner_device
+# device id as seen by scanservjs - visit the scanserv UI to get this value
+#export DEVICE_ID="" # insert if you know it and are sure it will never change, otherwise dynamically populated
+#export SANE_HOST="" # the address of the SANE-shared network scanne, IP also fine
+
+# parameters
+# see scanservjs docs/repo for an exhaustive list of enumerations
+export SSJS_RESOLUTION=300 # 50-600 DPI
+export SSJS_MODE="Color" # Color|Gray|Lineart etc
+export SSJS_SOURCE="ADF Duplex" # ADF Front|Back|Duplex
+export SSJS_BRIGHTNESS=0
+export SSJS_CONTRAST=0
+export SSJS_FILTERS=() # ("filter.auto-level" "filter.blur" "filter.threshold") - bash array will be converted to JSON, use spaces not commas!
+export SSJS_PIPELINE="ocrmypdf (JPG | @:pipeline.high-quality)" # custom pipelines also possible - see scanservjs docs for details.
+export SSJS_BATCH="auto" # none|manual|auto
+
+```
+
+## Notes on Sane over Network
+
+### server side (where usb scanner connected)
+
+#### sane service
+
+first set maxconnections:
+
+`sudo systemctl edit --full saned.socket`
+
+set `MaxConnections=64`
+
+then get sane.socket up and running:
+
+`systemctl enable sane.socket`
+`systemctl start sane.socket`
+
+### permissions
+
+`lsusb` to note vendor:device
+
+edit `/usr/lib/udev/rules.d/65-sane.rules`
+
+with
+
+`ATTRS{idVendor}=="vendorID", ATTRS{idProduct}=="productID", MODE="0664", GROUP="lp", ENV{libsane_matched}="yes"`
+
+where `vendorID` and `productID` are the vendor:device codes obtained by `lsusb`
+
+replug in scanner to apply
+
+### firewall
+
+sane uses port 6566 by default
+
+`firewall-cmd --add-service=sane --permanent`
+
+### enable access list subnets
+
+add subnet you would like to provide scanner access to in `/etc/sane.d/saned.conf`
+
+### testing
+
+always test using the `saned` user.
+
+`su -s /bin/bash saned`
+`scanimage -L`
