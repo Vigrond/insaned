@@ -42,6 +42,5 @@ unset IFS
 set +f
 set +e
 
+echo ${INSANED_EXTRAOPTS}
 /usr/bin/insaned -nvvvv ${INSANED_EXTRAOPTS}
-
-tail -f /dev/null

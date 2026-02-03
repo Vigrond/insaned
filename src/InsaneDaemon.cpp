@@ -435,6 +435,8 @@ void InsaneDaemon::sighandler(int signum)
 #endif
 #ifdef SIGPIPE
     case SIGPIPE:
+        //daemon.log("Aborting to avoid segfault (https://github.com/Vigrond/insaned/issues/1), in hopes the container restarts correctly...", 1);
+        //std::exit(70);
 #endif
     case SIGINT:
     case SIGTERM:
